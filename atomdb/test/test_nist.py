@@ -46,6 +46,28 @@ TEST_CASES_MAKE_PROMOLECULE = [
     pytest.param(
         {
             "dataset": "nist",
+            "elem": "H",
+            "atnum": 1,
+            "obasis_name": None,
+            "nelec": 2,
+            "nspin": 0,
+            "nexc": 0,
+            "atmass": 1.007975 * AMU,
+            "cov_radius": None,
+            "vdw_radius": None,
+            "at_radius": None,
+            "polarizability": None,
+            "dispersion_c6": None,
+            "energy": -109678.77174307 * CMINV - 0.754195 * EV,
+            "ip": 0.754195 * EV,
+            "mu": -2.28 * EV,
+            "eta": 0. * EV,
+        },
+        id="H anion",
+    ),
+    pytest.param(
+        {
+            "dataset": "nist",
             "elem": "C",
             "atnum": 6,
             "obasis_name": None,

@@ -171,7 +171,7 @@ Has items ``(atnum, charge): Tuple[int, int]``.
 
 def generate_mult_csv(max_atnum=100):
     r"""
-    Write a table of multiplicities to a CSV file.
+    Write a table of ground state multiplicities to a CSV file.
 
     Values retrieved from ``database_beta_1.3.0.h5`` are organized into a
     table, with rows corresponding to atomic numbers and columns to charges.

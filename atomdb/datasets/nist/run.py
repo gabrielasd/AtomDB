@@ -105,16 +105,17 @@ def run(elem, charge, mult, nexc, dataset, datapath):
     obasis_name = None
 
     # Check that the input charge is valid
-    if charge < -2 or charge > atnum:
+    max_neg_charge = -2
+    if charge < max_neg_charge or charge > atnum:
         raise ValueError(f"{elem} with {charge} not available.")
 
     # Check that the input multiplicity corresponds to this configuration.
-    if not mult == MULTIPLICITIES[(atnum, charge)]:
+    gs_mult = MULTIPLICITIES[(atnum, charge)]  # ground state multiplicity
+    if not mult == gs_mult:
         raise ValueError(f"{elem} with charge {charge} and multiplicity {mult} not available.")
 
-    #
     # Element properties
-    #
+    # These are basic periodic table properties mainly defined for neutral atomic species
     atom = Element(elem)
     atmass = atom.mass
     cov_radius, vdw_radius, at_radius, polarizability, dispersion = [
@@ -126,23 +127,14 @@ def run(elem, charge, mult, nexc, dataset, datapath):
         polarizability = atom.pold
         dispersion = {"C6": atom.c6}
 
-    #
-    # Get the ground state energy from database_beta_1.3.0.h5.
-    #
-    # Set an energy default value since there is no data for anions in database_beta_1.3.0.h5.
-    energy = None
-    h5path = os.path.join(MODULE_DATAPATH, "database_beta_1.3.0.h5")
-    if charge >= 0:  # neutral or cationic species
-        spectra_data = load_nist_spectra_data(atnum, nelec, h5path)
-        energies = spectra_data["energy"]
-        # Convert energy to Hartree from cm^{-1} if available
-        energy = energies[0] * CMINV if len(energies) != 0 else energy
-
-    # Get conceptual-DFT related properties from c6cp04533b1.csv
+    # Get conceptual-DFT related properties for neutral and charged species from c6cp04533b1.csv
     # Locate where each table starts: search for "Element" columns
     csvpath = os.path.join(MODULE_DATAPATH, "c6cp04533b1.csv")
     data = list(csv.reader(open(csvpath, "r")))
     tabid = [i for i, row in enumerate(data) if "Element" in row]
+    # Check that the CSV file has not been modified and it has the expected number of tables (3)
+    if len(tabid) != 3:
+        raise ValueError(f"Unexpected conceptual-DFT CSV file format; expected 3 tables, got {len(tabid)}.")
     # Assign each conceptual-DFT data table to a variable.
     # Remove empty and header rows
     table_ips = data[tabid[0] : tabid[1]]
@@ -158,6 +150,27 @@ def run(elem, charge, mult, nexc, dataset, datapath):
     mu = float(table_mus[atnum][colid]) * EV if len(table_mus[atnum][colid]) > 1 else None
     colid = table_etas[0].index(str(charge))
     eta = float(table_etas[atnum][colid]) * EV if len(table_etas[atnum][colid]) > 1 else None
+
+    # Get the ground state (GS) energy from database_beta_1.3.0.h5.
+    # Set an energy default value since there is no data for anions in database_beta_1.3.0.h5.
+    energy = None
+    h5path = os.path.join(MODULE_DATAPATH, "database_beta_1.3.0.h5")
+    if charge >= 0:  # neutral or cationic species
+        spectra_data = load_nist_spectra_data(atnum, nelec, h5path)
+        energies = spectra_data["energy"]
+        # Convert energy to Hartree from cm^{-1} if available
+        energy = energies[0] / CMINV if len(energies) != 0 else energy
+
+    # Compute the ground state energy for anions with charge=-1
+    # Use the ground state energy of the neutral species from database_beta_1.3.0.h5
+    # and subtract the ionization potential of the anion from the conceptual-DFT data c6cp04533b1.csv
+    # This is: E_anion = E_neutral - IP_anion.
+    # This procedure does not work if there is no GS data for the neutral species, or if the anion's IP 
+    # is zero or None.
+    if charge == -1 and ip not in [None, 0]: # check IP is not zero or None
+        neutral_energy = load_nist_spectra_data(atnum, atnum, h5path)["energy"]
+        # Convert energy to Hartree from cm^{-1} if available
+        energy = (neutral_energy[0] / CMINV + ip) if len(neutral_energy) != 0 else energy
 
     # Return Species instance
     fields = dict(
